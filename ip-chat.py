@@ -377,7 +377,7 @@ APP_TAG = "IPChat1"                  # marks our own announcements
 #    "sha256": "optional - sha256 of ip-chat.py, checked before it's installed"}
 # Push a new version by editing update.json's "version"/"notes" and pushing the new
 # ip-chat.py to the "url" above; nothing else needs to change.
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/chudlifeforever54/ip-chat/refs/heads/main/update.json"
 UPDATE_CHECK_TIMEOUT = 10
 UPDATE_DOWNLOAD_TIMEOUT = 30
@@ -2647,6 +2647,7 @@ class ChatApp:
         if self.identity is not None:
             self.root.after(300, self.offer_packages)
         self.root.after(1500, lambda: self.check_for_updates(manual=False))
+        self.root.after(2000, self.convert_to_pyw_if_stable)
 
     def offer_packages(self):
         """At launch: if optional packages are missing, say what they do and offer them."""
@@ -2829,6 +2830,36 @@ class ChatApp:
         except OSError as e:
             messagebox.showerror("Restart", f"Could not restart the program:\n{e}\n\n"
                                             "Close it and open it again yourself.")
+            return
+        self.quit()
+
+    def convert_to_pyw_if_stable(self):
+        """One-time self-upgrade: if we're still running fine a couple seconds after
+        startup (no fatal crash) and this is still the old console-showing ip-chat.py,
+        switch over to a console-less ip-chat.pyw from now on - renaming the file in
+        place and relaunching with pythonw.exe (python.exe would still pop a console
+        open even for a .pyw file). A no-op once that's already happened once."""
+        script = os.path.abspath(sys.argv[0])
+        root_name, ext = os.path.splitext(script)
+        if ext.lower() != ".py":
+            return
+        new_path = root_name + ".pyw"
+        try:
+            if os.path.exists(new_path):
+                os.remove(new_path)   # leftover from an earlier, interrupted attempt
+            os.rename(script, new_path)
+        except OSError:
+            return   # in use, no permission, etc. - just keep running as-is, try again next launch
+
+        exe = sys.executable
+        if os.name == "nt":
+            candidate = os.path.join(os.path.dirname(sys.executable) or "", "pythonw.exe")
+            if os.path.exists(candidate):
+                exe = candidate
+        try:
+            subprocess.Popen([exe, new_path] + sys.argv[1:],
+                             cwd=os.path.dirname(new_path) or None)
+        except OSError:
             return
         self.quit()
 
