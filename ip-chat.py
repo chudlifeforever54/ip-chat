@@ -378,7 +378,7 @@ APP_TAG = "IPChat1"                  # marks our own announcements
 # Push a new version by editing update.json's "version"/"notes" and pushing the new
 # ip-chat.py to the "url" above; nothing else needs to change.
 APP_VERSION = "1.0.0"
-UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/YOUR-USERNAME/YOUR-REPO/main/update.json"
+UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/chudlifeforever54/ip-chat/refs/heads/main/update.json"
 UPDATE_CHECK_TIMEOUT = 10
 UPDATE_DOWNLOAD_TIMEOUT = 30
 ID_LENGTH = 10                       # your friend ID: 10 letters and numbers
