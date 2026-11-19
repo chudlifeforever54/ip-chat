@@ -22,6 +22,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import urllib.request
@@ -196,35 +197,110 @@ def run_setup():
     return install_dir, target_script, lnk_path, manifest["version"], launched
 
 
-def main():
-    try:
-        install_dir, target_script, lnk_path, version, launched = run_setup()
-    except Exception as e:
-        message = (f"Setup could not finish:\n\n{e}\n\n"
-                   "Check your internet connection and try running this again.")
-        try:
-            import tkinter as tk
-            from tkinter import messagebox
-            r = tk.Tk(); r.withdraw()
-            messagebox.showerror("IP Chat - Setup", message)
-        except Exception:
-            print(message)
-        sys.exit(1)
+def installed_script_path():
+    return os.path.join(choose_install_dir(), "ip-chat.pyw")
 
-    lines = [f"IP Chat {version} is installed:", target_script]
-    if lnk_path:
-        lines.append(f'\nA shortcut ("IP Chat") was created there too - drag it onto '
-                      "your taskbar to pin it.")
-    if launched:
-        lines.append("\nIt should be opening now.")
-    message = "\n".join(lines)
+
+def report(title, message, error=False):
     try:
         import tkinter as tk
         from tkinter import messagebox
         r = tk.Tk(); r.withdraw()
-        messagebox.showinfo("IP Chat - Setup", message)
+        (messagebox.showerror if error else messagebox.showinfo)(title, message, parent=r)
+        r.destroy()
     except Exception:
         print(message)
+
+
+def do_fresh_install():
+    """A brand new install: nothing at `installed_script_path()` yet."""
+    try:
+        install_dir, target_script, lnk_path, version, launched = run_setup()
+    except Exception as e:
+        report("IP Chat - Setup",
+               f"Setup could not finish:\n\n{e}\n\n"
+               "Check your internet connection and try running this again.", error=True)
+        sys.exit(1)
+
+    lines = [f"IP Chat {version} is installed:", target_script]
+    if lnk_path:
+        lines.append('\nA shortcut ("IP Chat") was created there too - drag it onto '
+                      "your taskbar to pin it.")
+    if launched:
+        lines.append("\nIt should be opening now.")
+    report("IP Chat - Setup", "\n".join(lines))
+
+
+def show_existing_menu(install_dir):
+    """IP Chat is already installed at `install_dir`. Offers three things: leave it
+    alone (Exit), wipe it completely except the Downloads\\IP Chat folder of files
+    people have sent/received (Delete IPChat), or just fetch the current script,
+    icon and shortcut again without touching settings.json, friends.json or ID.json
+    (Redownload) - so re-running setup never costs you your identity or friends."""
+    import tkinter as tk
+    from tkinter import messagebox
+
+    bg, panel, text, muted = "#0f172a", "#1e293b", "#e2e8f0", "#94a3b8"
+    root = tk.Tk()
+    root.title("IP Chat - Setup")
+    root.configure(bg=bg)
+    root.resizable(False, False)
+    card = tk.Frame(root, bg=panel, padx=28, pady=24)
+    card.pack(padx=20, pady=20)
+    tk.Label(card, text="IP Chat is already installed", font=("Segoe UI", 14, "bold"),
+             bg=panel, fg=text).pack()
+    tk.Label(card, text=install_dir, font=("Segoe UI", 9), bg=panel, fg=muted,
+             wraplength=380, justify="center").pack(pady=(4, 16))
+
+    def do_exit():
+        root.destroy()
+
+    def do_delete():
+        if not messagebox.askyesno(
+                "Delete IP Chat",
+                "This removes the installed program, your settings, your friends "
+                "list, and your identity (ID.json).\n\n"
+                "Your Downloads\\IP Chat folder - anything you've sent or received - "
+                "is NOT touched.\n\nAre you sure?", parent=root):
+            return
+        try:
+            shutil.rmtree(install_dir)
+        except OSError as e:
+            messagebox.showerror("Delete IP Chat", f"Could not delete everything:\n{e}",
+                                 parent=root)
+            return
+        root.destroy()
+        report("IP Chat - Setup", "IP Chat has been removed.")
+
+    def do_redownload():
+        root.destroy()
+        try:
+            _install_dir, target_script, lnk_path, version, launched = run_setup()
+        except Exception as e:
+            report("IP Chat - Setup",
+                   f"Could not redownload:\n\n{e}\n\n"
+                   "Check your internet connection and try again.", error=True)
+            return
+        lines = [f"IP Chat {version} has been redownloaded:", target_script,
+                 "\nYour settings, friends and identity were not touched."]
+        if launched:
+            lines.append("\nIt should be opening now.")
+        report("IP Chat - Setup", "\n".join(lines))
+
+    buttons = tk.Frame(card, bg=panel)
+    buttons.pack()
+    tk.Button(buttons, text="Exit", width=14, command=do_exit).pack(side="left", padx=4)
+    tk.Button(buttons, text="Delete IPChat", width=14, command=do_delete).pack(side="left", padx=4)
+    tk.Button(buttons, text="Redownload", width=14, command=do_redownload).pack(side="left", padx=4)
+    root.mainloop()
+
+
+def main():
+    install_dir = choose_install_dir()
+    if os.path.exists(os.path.join(install_dir, "ip-chat.pyw")):
+        show_existing_menu(install_dir)
+    else:
+        do_fresh_install()
 
 
 if __name__ == "__main__":
