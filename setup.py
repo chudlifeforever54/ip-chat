@@ -183,22 +183,28 @@ def run_setup():
     except (OSError, subprocess.TimeoutExpired, subprocess.SubprocessError):
         pass   # the shortcut is a nice-to-have - a failed one shouldn't fail setup
 
-    exe = sys.executable
-    if os.name == "nt":
-        pyw_exe = os.path.join(os.path.dirname(sys.executable) or "", "pythonw.exe")
-        if os.path.exists(pyw_exe):
-            exe = pyw_exe
-    try:
-        subprocess.Popen([exe, target_script], cwd=install_dir)
-        launched = True
-    except OSError:
-        launched = False
+    launched = launch_installed(target_script)
 
     return install_dir, target_script, lnk_path, manifest["version"], launched
 
 
 def installed_script_path():
     return os.path.join(choose_install_dir(), "ip-chat.pyw")
+
+
+def launch_installed(target_script):
+    """Starts the already-installed ip-chat.pyw at `target_script`. Returns True if the
+    process was actually started, False otherwise (never raises)."""
+    exe = sys.executable
+    if os.name == "nt":
+        pyw_exe = os.path.join(os.path.dirname(sys.executable) or "", "pythonw.exe")
+        if os.path.exists(pyw_exe):
+            exe = pyw_exe
+    try:
+        subprocess.Popen([exe, target_script], cwd=os.path.dirname(target_script))
+        return True
+    except OSError:
+        return False
 
 
 def report(title, message, error=False):
@@ -255,6 +261,15 @@ def show_existing_menu(install_dir):
     def do_exit():
         root.destroy()
 
+    def do_start():
+        target_script = os.path.join(install_dir, "ip-chat.pyw")
+        started = launch_installed(target_script)
+        root.destroy()
+        if not started:
+            report("IP Chat - Setup",
+                   "Could not start IP Chat. Try Redownload if this keeps happening.",
+                   error=True)
+
     def do_delete():
         if not messagebox.askyesno(
                 "Delete IP Chat",
@@ -289,6 +304,8 @@ def show_existing_menu(install_dir):
 
     buttons = tk.Frame(card, bg=panel)
     buttons.pack()
+    tk.Button(buttons, text="Start IPChat", width=14, command=do_start,
+              default="active").pack(side="left", padx=4)
     tk.Button(buttons, text="Exit", width=14, command=do_exit).pack(side="left", padx=4)
     tk.Button(buttons, text="Delete IPChat", width=14, command=do_delete).pack(side="left", padx=4)
     tk.Button(buttons, text="Redownload", width=14, command=do_redownload).pack(side="left", padx=4)
